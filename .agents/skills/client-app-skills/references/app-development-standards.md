@@ -1,0 +1,410 @@
+# App Development Design Spec
+
+## 技能优先顺序
+
+- 通用 App 架构先遵守 `skills/app-spec/SKILL.md`
+- App HTTP API 设计遵守 `skills/app-api/SKILL.md`
+- App Rive 动画设计与接入遵守 `skills/app-rive/SKILL.md`
+- iOS 平台能力遵守 `skills/app-ios/SKILL.md`
+- Android 平台能力遵守 `skills/app-android/SKILL.md`
+- 若本文与 skill 冲突，以更具体的 skill 为准
+
+---
+
+## 核心规则清单
+
+- 分层边界：Widget 只负责 UI，业务流程走 Provider/UseCase，数据访问走 Repository。
+- 数据隔离：API DTO 不直接进入 UI，必须映射为 Entity/ViewModel。
+- 状态明确：区分 server/client/derived/persistent state，禁止重复存储派生状态。
+- 依赖单向：上层依赖抽象，底层实现细节不得反向依赖 UI/业务页面。
+- 动画边界：复杂互动动画使用 Rive；Rive 仅限 `presentation/` 层使用。
+- 错误完整：异步流程必须覆盖 loading/success/empty/error/retry。
+- 写入幂等：提交、支付、删除、点赞等写操作必须防重复和支持安全重试。
+- 扩展集中：支付方式、登录方式、角色、渠道、主题等变化点集中管理。
+- 可观测性：登录、支付、提交、同步、权限失败、接口错误必须可追踪。
+- 简单演进：不过度设计，但不能破坏边界；抽象必须服务于重复、变化或隔离。
+
+---
+
+## 技术栈选型表
+
+| Layer            | Choice                          |
+|------------------|---------------------------------|
+| 跨平台框架        | Flutter                         |
+| 语言              | Dart                            |
+| 状态管理          | Riverpod                        |
+| HTTP             | Dio + interceptors              |
+| 路由              | GoRouter                        |
+| 不可变模型        | freezed + json_serializable     |
+| 权限              | permission_handler              |
+| 互动动画          | Rive（rive）                    |
+
+---
+
+## 目录结构规范
+
+```
+lib/
+├── modules/                  # 业务模块（按功能划分）
+│   ├── splash/               # 启动屏：版本展示、广告、更新检查
+│   ├── login/
+│   └── home/
+│       ├── chat/
+│       └── player/
+├── common/
+│   ├── widgets/              # 纯 UI 组件（无业务逻辑）
+│   ├── providers/            # 跨模块共享 Riverpod providers
+│   ├── http/                 # Dio 单例 + 拦截器
+│   ├── analytics/            # Analytics adapter 接口 + 实现
+│   └── permissions/          # permission_handler 统一封装
+├── router/                   # GoRouter 配置
+└── main.dart
+
+# 每个 modules/xxx/ 内部三层结构：
+modules/login/
+├── presentation/             # UI 层：Widget + AsyncNotifier
+│   ├── login_page.dart
+│   └── login_provider.dart
+├── domain/                   # 领域层：Repository 接口 + 业务实体
+│   ├── login_repository.dart # 抽象接口
+│   └── user_entity.dart      # freezed 实体
+└── data/                     # 数据层：Repository 实现 + API + DTO
+    ├── login_repository_impl.dart
+    ├── login_api.dart
+    └── login_dto.dart        # json_serializable DTO
+```
+
+**Rules:**
+- 每个 `modules/xxx/` 包含：`presentation/`、`domain/`、`data/` 三层
+- 资源文件（图片）放模块内 `assets/` 目录
+- 模块内 Rive 资源放 `assets/rive/`
+- 跨模块共享 Rive 资源放 `common/assets/rive/`
+- `common/widgets/` 必须是纯 UI — 无 API 调用，无业务 provider 依赖
+
+---
+
+## 命名约定规范
+
+| 目标               | 规范                              | 示例                              |
+|--------------------|-----------------------------------|-----------------------------------|
+| Widget / Class     | PascalCase                        | `LoginPage`, `UserCard`           |
+| 文件名              | snake_case                        | `login_page.dart`                 |
+| 变量                | lowerCamelCase                    | `userProfile`, `requestBody`      |
+| 布尔变量            | `is` / `has` / `can` / `should` 开头 | `isLoading`, `hasPermission`      |
+| 函数 / 方法         | lowerCamelCase，动词开头           | `loadUser`, `submitOrder`         |
+| 事件处理函数        | `handleXxx`                       | `handleSubmit`, `handleRetry`     |
+| UI 辅助构建方法     | `buildXxx`                        | `buildHeader`, `buildLoadingView` |
+| 数据转换方法        | `mapXxx` / `toXxx`                | `mapDtoToEntity`, `toViewModel`   |
+| 校验方法            | `validateXxx` / `checkXxx`        | `validateInput`, `checkLoginStatus` |
+| 常量               | lowerCamelCase                    | `maxRetryCount`                   |
+| Provider           | camelCase + Provider 后缀         | `loginProvider`                   |
+| Repository 接口     | PascalCase + Repository           | `LoginRepository`                 |
+| DTO                | PascalCase + Dto                  | `LoginDto`                        |
+| 图片文件            | `module_feature_desc.png`         | `uc_user_icon.png`                |
+| CSS class          | 不适用（Flutter 无 CSS）          | —                                 |
+
+- 变量、成员变量、局部变量、内部对象变量、私有成员、私有方法统一使用 `lowerCamelCase`
+- 变量命名使用名词、名词短语或状态描述；函数命名使用动词或动作短语
+- 禁止使用 `_` 作为变量名或方法名前缀区分私有作用域
+- 禁止使用 `fn`、`obj`、`m`、`s` 等类型或作用域前缀
+- 禁止单字母变量（循环索引除外）
+- 使用完整单词；通用缩写除外（msg, init, img, nav, btn, bg）
+- 避免无意义命名，如 `data`、`item`、`temp`、`value`、`obj`
+
+---
+
+## 代码质量约束
+
+- Single file: max **800 lines**
+- Single method/function: max **80 lines**
+- Methods between blank lines: **1 blank line**
+- Code blocks separated by: **1 blank line**
+- Delete unused: resources, methods, commented-out code, meaningless comments
+- Add comments at: class properties, complex methods, large code blocks
+
+---
+
+## 模块组织规范
+
+Organize by **business function**, not by file type.
+
+```
+# Good
+modules/
+  login/
+    presentation/
+    domain/
+    data/
+    assets/
+
+# Bad
+widgets/
+  login_form.dart
+pages/
+  login.dart
+```
+
+- Shared code/assets across modules → `common/`
+- A module that grows into a reusable library → extract to `packages/`
+
+---
+
+## 组件结构规范
+
+Group methods by function block in this order:
+
+**StatelessWidget:**
+```
+1. 构造函数（const 优先）
+2. build()
+```
+
+**ConsumerStatefulWidget（Riverpod）:**
+```
+1. State 变量（lowerCamelCase）
+2. initState()
+3. didChangeDependencies()
+4. didUpdateWidget()
+5. dispose()
+6. 事件处理方法（handleXxx）
+7. 异步/API 调用（通过 ref.read(provider.notifier).method()）
+8. 辅助 build 方法（buildXxx）
+9. build()
+```
+
+**AsyncNotifier（Provider 层）:**
+```
+1. build()          // 初始数据加载
+2. 业务方法         // 返回 AsyncValue 或抛出异常
+3. 辅助方法（lowerCamelCase，按语义命名）
+```
+
+**Repository 实现:**
+```
+1. 构造函数 + 依赖注入（Dio、本地存储）
+2. 接口方法实现
+3. 数据映射与辅助方法（lowerCamelCase，例如 `mapDtoToEntity`）
+```
+
+- 生命周期方法按**实际执行顺序**排列
+- 事件处理方法统一以 `handle` 前缀命名
+- Rive 初始化放 `onInit`，复杂控制逻辑不写在 `build()` 中
+- build 方法保持精简 — Widget 树超过 ~50 行则提取子 Widget
+
+---
+
+## 状态管理规范
+
+- 所有 Provider 定义在模块 `presentation/xxx_provider.dart`
+- 使用 AsyncNotifier 管理异步状态，UI 通过 AsyncValue 处理三态：
+  - `data`：正常渲染
+  - `loading`：骨架屏 / 加载指示器
+  - `error`：错误提示 + 重试入口
+- Provider 作用域：模块内 provider 不得被其他模块直接引用
+  → 跨模块共享状态放 `common/providers/`
+- 禁止在 Widget 内直接调用 API — 必须经由 Notifier 方法
+- Rive 动画状态由 Widget 或 Provider/Notifier 驱动，禁止传入 `domain/data`
+- 使用 `@riverpod` 注解生成 provider，禁止手动 new Provider
+
+---
+
+## Rive 动画接入规范
+
+- 统一使用官方 `rive` 包
+- 简单过渡动画优先 Flutter 原生动画；复杂互动动画再使用 Rive
+- 优先使用 `RiveAnimation.asset(...)` 加载 `.riv` 文件
+- 互动场景优先使用 State Machine
+- `.riv` 文件名使用 `snake_case`
+- Widget 负责展示与事件绑定；Provider/Notifier 负责动画状态
+- 禁止 `domain/`、`data/`、Repository、DTO、Entity 依赖 Rive 类型
+
+---
+
+## Pencil 设计稿图片组件转 Rive 场景
+
+- 当从 UI/UX 设计稿（Pencil）查询到某个组件本质是**图片**时，先不要默认按静态图片落地。
+- 必须先询问用户：
+  `这个图片组件是否需要生成/制作为 Rive 动画交互？`
+- 若用户选择 **否**：
+  - 按普通静态资源处理，落入模块 `assets/` 或共享资源目录
+  - 只输出图片切图、适配、占位、加载与缓存相关实现建议
+- 若用户选择 **是**：
+  - 先说明该图片是否适合转为 Rive：
+    - 适合：图标、插画、按钮反馈、状态切换、局部可拆分的视觉元素
+    - 不适合：复杂位图照片、强纹理图片、无法分层的单张合成图
+  - 然后输出一份**面向 Rive 新手**的操作指导，要求：
+    - 使用一步一步的方式说明如何在 Rive Editor 中操作
+    - 默认用户不了解 State Machine、Timeline、Trigger、Input
+    - 明确区分“素材准备”“导入与分层”“动画制作”“状态机连线”“导出给 Flutter”
+  - 最后给出执行计划，至少包含：
+    1. 确认该图片是否适合做 Rive 动画
+    2. 拆分图片图层或改为可分层矢量素材（SVG/AI）
+    3. 在 Rive Editor 中导入素材并整理命名
+    4. 创建 Artboard 与关键动画（进入、悬停、点击、成功/失败等）
+    5. 创建 State Machine 与 Inputs（Boolean/Trigger/Number）
+    6. 预览交互逻辑并修正节奏、锚点、循环方式
+    7. 导出 `.riv` 文件并定义 Flutter 接入方式
+
+**Rive Editor 新手指导输出模板：**
+
+1. 目标说明：先告诉用户这次要做什么动画，交互触发条件是什么。
+2. 素材准备：说明需要把原图拆成哪些层，哪些元素必须独立。
+3. 新建文件：指导用户在 Rive Editor 中创建文件、Artboard、命名尺寸。
+4. 导入素材：逐步说明如何导入 SVG/图片层，并检查锚点与层级。
+5. 建立动画：指导用户创建 Timeline，逐帧设置位移、缩放、透明度、旋转。
+6. 建立交互：指导用户创建 State Machine、添加 Trigger/Boolean/Number Inputs、连接状态。
+7. 预览验证：指导用户点击播放，检查首尾衔接、循环、点击反馈是否正确。
+8. 导出交付：说明如何导出 `.riv`，以及 Flutter 侧需要绑定哪些 State Machine/Input。
+
+**回答要求：**
+
+- 不要只给概念，必须给用户可执行的 Rive Editor 操作步骤
+- 遇到图片不适合直接转 Rive 时，要明确告知原因，并建议改为：
+  - 静态图片 + Flutter 原生动效
+  - 重新绘制为矢量分层素材后再导入 Rive
+- 如果用户明确表示“我是 Rive 新手”或“你一步一步带我做”，则回答中必须包含：
+  - 每一步要点击什么
+  - 每一步完成后应该看到什么结果
+  - 下一步之前需要检查什么
+
+---
+
+## 错误处理规范
+
+统一错误类型：
+
+```dart
+class AppError {
+  final String code;
+  final String message;
+  final Object? cause;
+  const AppError({required this.code, required this.message, this.cause});
+}
+```
+
+- **Repository 层**：捕获 DioException，转换为 AppError 抛出
+- **Notifier 层**：通过 AsyncValue.error 向上传递，不做额外处理
+- **UI 层**：统一 ErrorWidget 展示，提供重试按钮
+- **全局**：`runZonedGuarded` 包裹 `runApp`，捕获未处理异常上报
+- 网络错误由全局 Dio 拦截器统一 toast 提示，业务层不重复处理
+
+---
+
+## 网络请求规范
+
+- 全局单例 Dio，通过 Riverpod Provider 注入（禁止模块内 `new Dio()`）
+- Request 拦截器：注入 token → 添加公共 headers（appId、channelId）
+- Response 拦截器：
+  → 解析业务错误码 → 抛出 AppError
+  → 401 → 清除 token → 跳转登录
+  → 网络超时/断网 → 全局 toast
+- 超时配置：connectTimeout 10s，receiveTimeout 30s
+- 所有 API 调用通过 Repository 层封装，Widget 不直接使用 Dio
+
+---
+
+## 代码生成规范
+
+- 实体/DTO：使用 `freezed` + `json_serializable`
+- Provider：使用 `@riverpod` 注解（riverpod_generator）
+- 运行生成命令：
+  ```bash
+  dart run build_runner build --delete-conflicting-outputs
+  ```
+- 生成文件（`*.g.dart`、`*.freezed.dart`）**提交到 git**，避免 CI 依赖生成步骤
+
+---
+
+## 静态检查规范
+
+继承 `flutter_lints`，额外启用：
+
+```yaml
+linter:
+  rules:
+    - always_use_package_imports    # 禁止跨模块相对路径引用
+    - prefer_const_constructors
+    - avoid_print                   # 使用 logger 替代 print
+    - require_trailing_commas       # 保持 diff 整洁
+```
+
+---
+
+## 埋点分析规范
+
+```dart
+Analytics.init(appId, userId, channelId);       // 应用启动时调用
+Analytics.sendEvent(eventId, attr);             // 用户行为事件
+Analytics.sendPageBegin(eventId, attr);         // 页面进入
+Analytics.sendPageEnd(eventId, attr);           // 页面离开
+```
+
+- Offline queue: cache events locally when network unavailable, batch-upload on reconnect
+- Backend provides both single-event and batch-event endpoints
+- Underlying implementation must be swappable (adapter pattern)
+
+**Required events (minimum):**
+
+| Event | Priority |
+|-------|----------|
+| App launch | High |
+| User registered | High |
+| Payment started | High |
+| Payment completed | High |
+| User logged in | Medium |
+| Promotion clicked | Medium |
+| App exit | Low |
+| Page enter/leave | Low |
+
+---
+
+## 权限处理规范
+
+使用 `permission_handler` 包，统一封装在 `common/permissions/`。
+
+Handle three states for every permission request:
+
+1. **Never asked** → request permission
+2. **Denied** → show dialog explaining why → link to system settings
+3. **Granted** → proceed
+
+Permissions to cover: camera, microphone, location, storage, network.
+
+---
+
+## 必备功能清单
+
+| Feature | Priority | Notes |
+|---------|----------|-------|
+| Version check on launch | High | API call on splash, dialog to update |
+| Push notifications | High | See `skills/app-ios/SKILL.md` and `skills/app-android/SKILL.md` |
+| Splash version label | Medium | Display current app version |
+| Splash ad | Low | Configurable via API |
+
+---
+
+## 测试覆盖清单
+
+Every feature must cover:
+
+- **Network**: normal, offline, slow, no permission
+- **Permissions**: first request, denied, re-request after denial
+- **Memory**: repeated navigation, repeated data refresh, image/video loops
+- **Background/foreground**: repeated switching, long background → resume
+- **Input**: max length, overflow display (ellipsis), special characters
+- **Share**: all platforms, link tap, QR code scan
+- **Rive**: asset missing fallback, state machine trigger, repeated enter/exit, background resume
+
+---
+
+## 分支管理规范
+
+```
+master          production only, never commit directly
+  └── hotfix/*  cut from master, merge back to master + develop
+  └── develop   integration branch, never commit directly
+        └── function/*  feature branches, merge to develop when done
+```
+
+- Developer works on `function/your-name-feature` or personal branch
+- Develop → Master only after QA sign-off

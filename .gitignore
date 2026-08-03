@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Workspace-local temporary files
+tmp/
+plans/
+
+# Each project under projects/ is an independent Git repository.
+projects/*
+plans/
+
+# Editor settings
+.vscode/
+.idea/
+
+# Dependencies and build outputs inside projects
+**/node_modules/
+**/dist/
+**/build/
+**/.next/
+**/coverage/
+
+# Environment and logs
+**/.env
+**/.env.*
+!**/.env.example
+*.log
