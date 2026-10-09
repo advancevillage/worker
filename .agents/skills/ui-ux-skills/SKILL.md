@@ -1,11 +1,19 @@
 ---
 name: ui-ux-skills
-description: UI/UX设计规范
+description: 设计或优化 App、Web 和小程序的视觉与组件交互，提供组件选型、动效规范和精简 AI 提示词。适用于 UI/UX 方案与界面实现。
 ---
 
 # UI/UX设计规范
 
-按请求读取对应资料：
+先明确目标页面、用户与操作目的，沿用项目已有设计系统；项目不明确时先确认范围，不自动选取工作区项目。
 
-- 产品体验、视觉层级、交互与设计原则：[design-principles.md](references/design-principles.md)。
-- 卡通 iOS 设计系统：[ios-cartoon.md](references/ios-cartoon.md)。
+按任务读取资料，不全量加载组件库：
+
+- 产品体验、视觉层级与取舍：[principles.md](references/principles.md)。
+- 明确采用卡通 iOS 风格：[ios.md](references/ios.md)。
+- 设计或实现动效、手势：[motion.md](references/motion.md)。
+- 组件选型或生成提示词：[组件索引](references/components/index.md)，再读取对应分组。
+
+先定样式与状态，再配交互。每个动效应说明它反馈什么操作或状态；没有对应需求的组件不引入。
+
+用户只要计划或提示词时交付该内容；要求实施时按已有授权执行。提示词保持一段，写核心行为与特有边界，通用规则引用共享规范。提示词单独复制使用时，按目标平台补充必要的共享约束。

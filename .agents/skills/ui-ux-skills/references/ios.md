@@ -5,6 +5,8 @@ description: A cartoon/illustration style design system for iOS apps.
 
 ## 设计语言
 
+仅在项目采用卡通 iOS 风格时使用。以下配色、描边和阴影是风格示例；已有项目优先使用自身令牌，不直接全量替换。手势、异步状态和减少动态效果遵循 [motion.md](motion.md)。
+
 卡通风格 iOS 设计系统的核心特征：
 
 - **粗描边**：所有元素带 2px 深色边框，赋予插画感
@@ -337,17 +339,17 @@ Fill：Primary 色，右侧描边 2px #1A1A2E
 
 ```
 缓动：cubic-bezier(0.34, 1.56, 0.64, 1)  —— 弹性/卡通感
-时长：micro 80ms / short 150ms / medium 300ms / long 500ms
+时长：按压80ms / 恢复150ms / 状态150–200ms / 布局200–300ms；复杂演示可延至500ms，不延迟实际操作
 
-Bounce In   : scale 0.6→1.15→0.95→1，opacity 0→1
-Pop         : scale 1→1.2→1
+Bounce In   : 可选角色或庆祝效果，scale 0.6→1.15→0.95→1，opacity 0→1；常规内容使用短淡入
+Pop         : 可选轻微强调，scale 1→1.05→1
 Wobble      : rotate 0°→-8°→7°→-4°→3°→0°
-Float       : translateY 0→-8px→0（循环）
+Float       : 角色可选translateY 0→-8px→0；离屏/后台暂停，减少动态效果时关闭
 
 按压通用规则
 ──────────────────────────────
 Down : translate(shadow offset) + shadow 消失，80ms
-Up   : 回弹 translate(0,0) + shadow 出现，150ms 弹性缓动
+Up/Cancel : 恢复 translate(0,0) + shadow 出现，150ms；位移仅作用于视觉，不移动触控区
 ```
 
 ---
