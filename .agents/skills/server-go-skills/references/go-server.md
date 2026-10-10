@@ -4,6 +4,7 @@
 
 | 任务 | 资料 |
 |---|---|
+| 系统架构、风格选择与跨模块边界调整 | [架构设计](../../architecture-design-skills/SKILL.md) |
 | 编码、包边界、项目布局、依赖与配置 | [software.md](go-server/software.md) |
 | 接口、构造、配置选项与对象所有权 | [object.md](go-server/object.md) |
 | 抽象与设计模式选择 | [pattern.md](go-server/pattern.md) |

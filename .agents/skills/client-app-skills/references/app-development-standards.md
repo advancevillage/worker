@@ -2,21 +2,22 @@
 
 ## 技能优先顺序
 
-- 通用 App 架构先遵守 `skills/app-spec/SKILL.md`
-- App HTTP API 设计遵守 `skills/app-api/SKILL.md`
-- App Rive 动画设计与接入遵守 `skills/app-rive/SKILL.md`
-- iOS 平台能力遵守 `skills/app-ios/SKILL.md`
-- Android 平台能力遵守 `skills/app-android/SKILL.md`
-- 若本文与 skill 冲突，以更具体的 skill 为准
+- 通用 App 架构先遵守 [App 架构](app-spec.md)。
+- App HTTP API 设计遵守 [App API](app-api.md)。
+- App Rive 动画设计与接入遵守本文 [Rive 动画接入规范](#rive-动画接入规范)。
+- iOS 平台能力遵守 [iOS](app-ios.md)。
+- Android 平台能力遵守 [Android](app-android.md)。
+- 系统选型、跨端或跨模块重构按需读取 [架构设计](../../architecture-design-skills/SKILL.md)。
+- 若本文与专项资料冲突，以更具体的规范为准；用户指令和项目约定优先。
 
 ---
 
 ## 核心规则清单
 
-- 分层边界：Widget 只负责 UI，业务流程走 Provider/UseCase，数据访问走 Repository。
+- 分层边界：Widget 只负责 UI，业务流程走 Provider/UseCase，数据访问走 Repository；简单流程无需空转发 UseCase。
 - 数据隔离：API DTO 不直接进入 UI，必须映射为 Entity/ViewModel。
 - 状态明确：区分 server/client/derived/persistent state，禁止重复存储派生状态。
-- 依赖单向：上层依赖抽象，底层实现细节不得反向依赖 UI/业务页面。
+- 源码依赖：业务依赖 domain 契约，data 实现契约且不得依赖 UI/业务页面；运行时调用方向单独表达。
 - 动画边界：复杂互动动画使用 Rive；Rive 仅限 `presentation/` 层使用。
 - 错误完整：异步流程必须覆盖 loading/success/empty/error/retry。
 - 写入幂等：提交、支付、删除、点赞等写操作必须防重复和支持安全重试。
@@ -201,7 +202,7 @@ Group methods by function block in this order:
   - `loading`：骨架屏 / 加载指示器
   - `error`：错误提示 + 重试入口
 - Provider 作用域：模块内 provider 不得被其他模块直接引用
-  → 跨模块共享状态放 `common/providers/`
+  → 真正共同拥有的状态放 `common/providers/`，明确唯一维护者；其他业务模块通过公共契约协作，不为共享而搬入 common
 - 禁止在 Widget 内直接调用 API — 必须经由 Notifier 方法
 - Rive 动画状态由 Widget 或 Provider/Notifier 驱动，禁止传入 `domain/data`
 - 使用 `@riverpod` 注解生成 provider，禁止手动 new Provider

@@ -45,6 +45,7 @@ Use this skill when designing, implementing, or reviewing App features. It defin
 
 原则：
 - App 默认分为 UI、ViewModel/Provider、UseCase/Service、Repository、Infrastructure 五类职责。
+- 五类职责不要求对应五个目录或独立类；简单流程可合并编排实现，需要业务复用或隔离时再拆出 UseCase，保持 UI、业务与外部系统的责任边界。
 
 必须：
 - UI Component 只负责展示和交互事件派发。
@@ -59,7 +60,7 @@ Use this skill when designing, implementing, or reviewing App features. It defin
 - 公共 UI 组件依赖业务 API 或业务 Provider。
 
 推荐：
-- 页面调用方向保持为 `Page -> Provider/ViewModel -> UseCase/Service -> Repository -> API/Storage/SDK`。
+- 完整流程的运行时调用为 `Page -> Provider/ViewModel -> UseCase/Service -> Repository 实现 -> API/Storage/SDK`；简单流程可由 Provider/ViewModel 调用 Repository 契约，不创建空转发 UseCase。
 
 ---
 
@@ -112,15 +113,16 @@ Use this skill when designing, implementing, or reviewing App features. It defin
 ## 六、依赖方向约束
 
 原则：
-- 高层依赖抽象，低层提供实现，依赖方向必须单向。
+- 源码依赖指向稳定业务契约并保持无环；运行时调用方向与源码依赖方向分开表达。
 
 必须：
 - 业务逻辑依赖 Repository 接口，不依赖具体 API 实现。
+- Repository 接口归 domain，data/infrastructure 实现接口，由组装处或 Provider 注入；实现层依赖 domain 接口符合依赖倒置。
 - 第三方 SDK、请求库、本地存储、路由、埋点都必须封装后使用。
 - 跨模块协作通过明确接口、事件或共享抽象完成。
 
 禁止：
-- 下层模块 import 上层模块。
+- domain 依赖 data/infrastructure 实现；data/infrastructure 依赖 presentation 或具体页面。
 - Domain 层依赖 Flutter Widget、Dio、localStorage、平台 SDK。
 - 模块之间读取彼此内部文件或内部状态。
 
@@ -223,8 +225,8 @@ Use this skill when designing, implementing, or reviewing App features. It defin
 - 简单优先，但简单不能破坏边界；抽象必须服务于明确变化。
 
 必须：
-- 小功能可以轻量实现，但仍需保持分层和依赖方向。
-- 当重复出现两次以上，或变化点已经明确时，再抽象公共能力。
+- 小功能可以合并实现职责，但保持 UI、业务与数据访问边界及源码依赖方向。
+- 公共抽象依据实际复用、变化或隔离收益决定，不以固定重复次数机械判断。
 - 复杂度必须有业务收益或维护收益。
 
 禁止：

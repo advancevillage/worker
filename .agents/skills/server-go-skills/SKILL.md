@@ -22,6 +22,7 @@ description: 设计、实现、重构或评审 Go 服务端代码，提供精简
 
 ## 按需读取
 
+- 系统选型、跨模块边界调整或架构重构：[架构设计](../architecture-design-skills/SKILL.md)，普通局部编码无需读取。
 - 编码、项目布局、对象与 HTTP：[Go 开发索引](references/go-server.md)，仅继续读取相关专题。
 - 数据访问、事务、重试、并发与服务生命周期：[服务设计](references/server-design-principles.md)。
 - OLAIP 协议或流式卡片：[OLAIP](references/olaip.md)，普通 Go 任务无需读取。
