@@ -1,156 +1,68 @@
-# Go 对象创建规范
+# Go 接口与 Option 设计
 
-> 接口定义 + 单一职责 + 泛型 Option 模式
+以下是工作区个人默认约定；已有项目按任务范围保持兼容。
 
----
+## 接口与构造
 
-## 规范要点
+- 业务服务、领域能力和客户端默认暴露职责明确的接口，构造函数默认返回接口；DTO、配置和纯数据类型无需接口。
+- 接口只包含该职责的方法，避免巨型接口；命名沿用项目约定，调用方需要更小依赖时可定义接口子集。
+- 必填依赖显式传入，可选配置使用 `opts ...XXXOption` 和 `WithXXX`；设置默认值，依次覆盖，最后统一校验。
+- `XXXOption` 采用带私有 `apply` 方法的接口；可复用泛型 `Option[T]`，不强制统一泛型框架。私有 apply 意味着选项由定义包提供。
+- 仅初始化涉及可取消 I/O 时传入 Context；运行期方法按需接收 Context。配置无效或初始化可能失败时返回 error。
 
-1. **定义接口**：对外暴露接口而非具体类型，遵循单一职责原则。
-2. **构造函数签名**：`NewXXXClient(ctx context.Context, logger logx.ILoger, opts ...XXXOption) (IXXXClient, error)`
-3. **Option 模式**：使用泛型 `Option[T]` 接口，调用方以函数式选项配置，内部有默认值兜底。
+## 最小示例
 
----
-
-## 完整示例
+客户端返回接口，Option 也是接口。必填 HTTP 客户端显式注入；示例以传入客户端的超时为默认值，`WithTimeout` 按顺序覆盖，零表示无整体超时。
 
 ```go
-package anthropic
+package client
 
 import (
-    "context"
-    "time"
-
-    "github.com/zeromicro/go-zero/core/logx"
+	"fmt"
+	"net/http"
+	"time"
 )
 
-// ── 1. 对外接口（单一职责）────────────────────────────────────────────
-
-type IAnthropicClient interface {
-    Complete(ctx context.Context, prompt string) (string, error)
-    // 只暴露该客户端的职责方法，不混入其他领域操作
+type Client interface {
+	Do(*http.Request) (*http.Response, error)
 }
 
-// ── 2. 泛型 Option 基础设施 ──────────────────────────────────────────
+type ClientOption interface{ apply(*http.Client) }
+type timeoutOption time.Duration
 
-type Option[T any] interface {
-    apply(*T)
+func (o timeoutOption) apply(c *http.Client)   { c.Timeout = time.Duration(o) }
+func WithTimeout(d time.Duration) ClientOption { return timeoutOption(d) }
+
+type client struct{ httpClient *http.Client }
+
+func NewClient(base *http.Client, opts ...ClientOption) (Client, error) {
+	if base == nil {
+		return nil, fmt.Errorf("HTTP client is required")
+	}
+	cfg := *base
+	for _, opt := range opts {
+		if opt == nil {
+			return nil, fmt.Errorf("nil client option")
+		}
+		opt.apply(&cfg)
+	}
+	if cfg.Timeout < 0 {
+		return nil, fmt.Errorf("timeout must not be negative")
+	}
+	return &client{httpClient: &cfg}, nil
 }
 
-type funcOption[T any] struct {
-    f func(*T)
-}
-
-func (o funcOption[T]) apply(do *T) {
-    o.f(do)
-}
-
-func newFuncOption[T any](f func(*T)) *funcOption[T] {
-    return &funcOption[T]{f: f}
-}
-
-// ── 3. 具体 Option 类型别名 + With 函数 ──────────────────────────────
-
-type AnthropicOption = Option[anthropicOption]
-
-func WithAnthropicApiKey(sk string) AnthropicOption {
-    return newFuncOption(func(o *anthropicOption) {
-        o.sk = sk
-    })
-}
-
-func WithAnthropicAuthType(ak string) AnthropicOption {
-    return newFuncOption(func(o *anthropicOption) {
-        o.ak = ak
-    })
-}
-
-func WithAnthropicTimeout(d time.Duration) AnthropicOption {
-    return newFuncOption(func(o *anthropicOption) {
-        o.timeout = d
-    })
-}
-
-func WithAnthropicUrl(url string) AnthropicOption {
-    return newFuncOption(func(o *anthropicOption) {
-        o.anthropicUrl = url
-    })
-}
-
-// ── 4. 内部配置结构 + 默认值 ─────────────────────────────────────────
-
-type anthropicOption struct {
-    ak           string
-    sk           string
-    timeout      time.Duration
-    anthropicUrl string
-}
-
-var defaultAnthropicOption = anthropicOption{
-    ak:           "oauth",
-    timeout:      time.Second * 300,
-    anthropicUrl: "https://api.anthropic.com",
-}
-
-// ── 5. 具体实现（私有）───────────────────────────────────────────────
-
-type anthropicClient struct {
-    opt    anthropicOption
-    logger logx.ILoger
-}
-
-func (c *anthropicClient) Complete(ctx context.Context, prompt string) (string, error) {
-    // 实现略
-    return "", nil
-}
-
-// ── 6. 构造函数 ──────────────────────────────────────────────────────
-
-// NewAnthropicClient 构造 Anthropic 客户端。
-// 参数：ctx 用于初始化阶段（如预热连接），logger 注入日志器，opts 覆盖默认配置。
-func NewAnthropicClient(ctx context.Context, logger logx.ILoger, opts ...AnthropicOption) (IAnthropicClient, error) {
-    opt := defaultAnthropicOption
-    for _, o := range opts {
-        o.apply(&opt)
-    }
-    return &anthropicClient{opt: opt, logger: logger}, nil
+func (c *client) Do(r *http.Request) (*http.Response, error) {
+	return c.httpClient.Do(r)
 }
 ```
 
----
+例中 Context 由请求携带；构造时不并发修改 base。复制配置保留原客户端设置但共享 Transport/Jar，调用方负责注入资源及响应体关闭；项目新客户端的默认值引用 [集中常量](software.md#集中定义)。
 
-## 关键约定
+## 所有权
 
-| 约定 | 说明 |
-|------|------|
-| 构造函数返回接口 | `IAnthropicClient` 而非 `*anthropicClient`，方便测试 mock |
-| `ctx` 作为第一个参数 | 用于初始化阶段的超时、链路追踪 |
-| `logger` 显式注入 | 不使用全局 logger，保持可测试性 |
-| 内部配置结构私有 | `anthropicOption` 小写，调用方只能通过 `With*` 函数配置 |
-| 默认值集中定义 | `defaultXXXOption` 提供合理默认，调用方按需覆盖 |
-| `Option` 泛型复用 | `funcOption[T]` 基础设施在包内复用，不重复实现 |
+- 明确对象是否并发安全、零值是否可用、何时需要 `Close`，以及谁负责关闭注入的资源；Option 仅用于构造，不在运行中修改共享配置。
+- 保存或返回 map/slice 时明确共享与可变性；需要隔离内部状态时复制，嵌套引用按契约处理，不能把浅复制当深复制。
+- 公共类型优先具名持有依赖；仅在确有语义收益且愿意暴露其方法时嵌入类型。
 
----
-
-## 使用方式
-
-```go
-client, err := anthropic.NewAnthropicClient(
-    ctx,
-    logger,
-    anthropic.WithAnthropicApiKey("sk-xxx"),
-    anthropic.WithAnthropicTimeout(60*time.Second),
-)
-if err != nil {
-    return err
-}
-resp, err := client.Complete(ctx, "Hello")
-```
-
----
-
-## 适用场景
-
-- 第三方 SDK 封装（AI、支付、短信、OSS 等）
-- 内部基础设施客户端（Redis、MQ、搜索引擎）
-- 任何需要多个可选配置项的对象初始化
+参考：[Go 接口建议](https://go.dev/wiki/CodeReviewComments#interfaces)、[Uber Functional Options](https://github.com/uber-go/guide/blob/master/style.md#functional-options)、[Uber 数据边界](https://github.com/uber-go/guide/blob/master/style.md#copy-slices-and-maps-at-boundaries)。接口返回属于个人约定，其他正确性建议统筹参考。

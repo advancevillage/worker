@@ -1,105 +1,44 @@
-# Go 服务程序目录规范
+# Go 编码与项目组织
 
----
+## 编码默认规则
 
-## 标准目录结构
+- 包名简短、小写、表达职责，避免 `util/common` 等杂物包；标识符用 MixedCaps，缩略词保持 `ID/URL/API` 一致。
+- receiver 用类型缩写且同类型保持一致；导出 API 注释说明契约，尤其是并发安全、所有权和失败行为。
+- imports 区分标准库与其他依赖；仅在冲突或名称不清楚时设置一致的别名。提前返回，减少嵌套与变量作用域。
+- 结构体优先具名初始化；枚举零值明确表示默认或无效状态，时间使用 `time.Duration/time.Time` 并明确单位。
+- 修改对象状态或包含锁时采用指针 receiver；含锁对象使用后不得复制，锁用具名字段而非嵌入。其他类型按语义选择并保持一致。
+- 必须处理可能失败的类型断言；避免接口指针，警惕接口包含 typed nil。`nil` 与空 slice 的 JSON 差异由 API 契约决定。
 
-```
-project/
-├── CMakeLists.txt       # 构建配置（如有 C/C++ 依赖）
-├── LICENSE
-├── README.md
-├── main.go              # 入口：初始化配置、internal 模块和服务
+## 布局与边界
+
+保持现有布局；新服务可采用以下最小结构，按需要添加目录：
+
+```text
+service/
 ├── go.mod
 ├── go.sum
-├── app/                 # 服务生命周期
-│   └── srv.go           # 服务启动与停止
-├── internal/            # 服务内部模块（不对外暴露）
-├── pkg/                 # internal 引用的公共库（可跨项目复用）
-├── conf/                # 配置文件目录
-└── deploy/              # 部署相关（Dockerfile、K8s yaml 等）
+├── main.go             # 单入口；多入口时可移入 cmd/<name>/
+├── pkg/
+│   └── const.go        # 集中常量与 sentinel
+└── internal/
+    ├── config/         # 配置与校验
+    ├── user/           # 按领域组织
+    └── server/         # HTTP 适配、依赖组装或生命周期
 ```
 
----
+- `main` 负责配置、组装和退出；业务规则归领域包，HTTP、数据库和 SDK 细节在适配边界。
+- 包依赖必须无环；业务能力通过职责明确的接口调用，纯数据类型与包内辅助逻辑可直接使用。
+- `internal/` 用于限制导入范围；本工作区采用 `pkg/const.go`，其余包按职责组织，不强制整个 `pkg/` 扁平化。公开包需要维护兼容性。
 
-## 各目录职责
+## 集中定义
 
-| 目录/文件 | 职责 |
-|-----------|------|
-| `main.go` | 程序入口，负责读取配置、初始化 `internal` 各模块、启动 `app/srv.go` |
-| `app/srv.go` | 服务启动逻辑，组装依赖、注册路由/handler、监听信号优雅退出 |
-| `internal/` | 业务逻辑核心，按领域拆子包（如 `internal/user`、`internal/order`），不允许外部项目导入 |
-| `pkg/` | `internal` 依赖的公共工具库，可被外部项目导入（如 util、middleware、errorcode） |
-| `conf/` | 配置文件（YAML/TOML/JSON），不放入代码逻辑 |
-| `deploy/` | Dockerfile、K8s manifests、CI 脚本 |
+- `pkg/const.go` 是项目常量唯一入口，按 Header/Cookie、业务错误码、缓存/ID 前缀、默认时长与阈值分组，使用具名常量与明确单位。
+- sentinel 放在同一文件的 `var` 分组，用 `errors.Is` 识别；常量包不依赖业务实现。领域模型及结构化错误类型仍由领域维护。
+- 运行期配置可覆盖默认常量，不将其或密钥作为常量；Context key 使用私有具名类型及访问函数，可集中在此文件，不用裸字符串 key。
+- Go 强制同包的定义（如私有 key、生成代码或类型绑定枚举）允许就地维护并说明原因，不为集中定义制造导入循环。
+- 配置加载后校验并注入；避免可变全局状态、隐式初始化和配置中的真实密钥。
+- 优先标准库与项目已有依赖；新增依赖评估维护情况、兼容性和收益，不固定绑定第三方工具库。
 
----
+启动、后台任务与关闭见 [服务设计](../server-design-principles.md)；接口与构造见 [对象设计](object.md)。
 
-## 外部依赖优先级
-
-优先引入已验证的外部依赖，避免重复造轮子：
-
-| 用途 | 优先依赖 |
-|------|---------|
-| 通用工具 / 基础库 | `github.com/advancevillage/3rd` |
-| 并发原语（errgroup、semaphore 等） | `golang.org/x/sync` |
-| 配置 / HTTP / gRPC / 存储客户端 | 优先选择社区主流稳定包 |
-
----
-
-## main.go 职责约束
-
-`main.go` 只做三件事，不写业务逻辑：
-
-1. **加载配置** — 读取 `conf/` 下的配置文件或环境变量
-2. **初始化模块** — 按依赖顺序初始化 `internal` 各子模块
-3. **启动服务** — 调用 `app.NewServer(...).Run()` 并阻塞等待退出信号
-
----
-
-## internal vs pkg 判断规则
-
-- **只在本项目内使用** → 放 `internal/`
-- **多个项目共享 / 通用工具** → 放 `pkg/`
-- `pkg/` 中的包不应依赖 `internal/` 中的包（单向依赖）
-
----
-
-## 设计约束
-
-- 禁止在 `pkg/` 中引入业务概念（不放 domain model）
-- `internal/` 子包之间通过接口通信，避免循环依赖
-- 配置结构体定义在 `conf/` 对应的 Go 文件或 `internal/config/` 中，`main.go` 解析后注入
-- 服务优雅退出逻辑在 `app/srv.go` 中统一处理（`signal.NotifyContext` + shutdown hook）
-
----
-
-## pkg/ 扁平布局
-
-- `pkg/` 下统一为单一 `package`（与目录同名），不引入子目录
-- 通过文件名区分内容：`const.go` / `resp.go` / `<resource>.go`
-- 强领域分隔时再考虑独立子目录
-
----
-
-## internal/ 资源命名
-
-- 子目录使用资源全名，避免缩写
-- 命名对齐对外暴露的资源边界，如 `/v1/sessions` ↔ `internal/session`
-- ✅ `internal/session` / `internal/account` / `internal/version`
-- ❌ `internal/ses` / `internal/acc` / `internal/ver`
-
----
-
-## 常量集中：pkg/const.go
-
-`pkg/const.go` 是常量唯一入口，承载：
-
-- HTTP Header / Cookie 字段名
-- 业务错误码字符串枚举
-- 上下文（ctx）字段名
-- 缓存 key 前缀、资源 ID 前缀
-- 默认时长、限流阈值等数值
-- 错误 sentinel（`var Err... = errors.New(...)`）
-
-`internal/` 子包不在自己包内重复定义这些常量，统一从 `pkg` 引用。
+依据：[Google 命名规则](https://google.github.io/styleguide/go/decisions#naming)、[Uber Guide](https://github.com/uber-go/guide/blob/master/style.md)、[Go 官方评审建议](https://go.dev/wiki/CodeReviewComments)。
