@@ -1,6 +1,6 @@
 ---
 name: server-go-skills
-description: 设计、实现、重构或评审 Go 服务端代码，提供精简的编码与服务设计规范；涉及 OLAIP 流式协议时读取其专题资料。
+description: 设计、实现、重构或评审 Go 服务端代码，提供精简的编码与服务设计规范；涉及 OLAIP 流式协议或 EduRich 教材排版协议标准与约定时读取其专题资料。
 ---
 
 # Go 服务开发规范
@@ -27,6 +27,8 @@ description: 设计、实现、重构或评审 Go 服务端代码，提供精简
 - 数据访问、事务、重试、并发与服务生命周期：[服务设计](references/server-design-principles.md)。
 - OLAIP 协议或流式卡片：[OLAIP](references/olaip.md)，普通 Go 任务无需读取。
 
+- EduRich 教材排版协议、中文公式与图文混排标准：[EduRich](references/edurich.md)。纯标准整理无需运行 Go 检查。
+
 ## 验证与交付
 
-执行 `gofmt`、相关 `go test` 和 `go vet`；沿用项目的 lint 配置。并发改动执行相关 `go test -race`，记录未能完成的检查及原因。测试覆盖行为与失败边界，避免复刻实现；交付说明变化、验证和剩余限制。
+涉及 Go 代码变更时，执行 `gofmt`、相关 `go test` 和 `go vet`；沿用项目的 lint 配置。并发改动执行相关 `go test -race`，记录未能完成的检查及原因。测试覆盖行为与失败边界，避免复刻实现；交付说明变化、验证和剩余限制。
