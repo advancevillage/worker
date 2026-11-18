@@ -4,10 +4,10 @@
 # Workspace-local temporary files
 tmp/
 plans/
+/worktree/
 
 # Each project under projects/ is an independent Git repository.
 projects/*
-plans/
 
 # Editor settings
 .vscode/
