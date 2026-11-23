@@ -1,0 +1,76 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "cover": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}\\.(png|jpg)$"
+      }
+    },
+    "preface": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}\\.(png|jpg)$"
+      }
+    },
+    "content": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}\\.(png|jpg)$"
+      }
+    },
+    "body": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[1-9][0-9]*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}\\.(png|jpg)$"
+      }
+    },
+    "afterword": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}\\.(png|jpg)$"
+      }
+    },
+    "copyright": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}\\.(png|jpg)$"
+      }
+    },
+    "back_cover": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}\\.(png|jpg)$"
+      }
+    },
+    "blank": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}\\.(png|jpg)$"
+      }
+    }
+  },
+  "required": [
+    "cover",
+    "preface",
+    "content",
+    "body",
+    "afterword",
+    "copyright",
+    "back_cover",
+    "blank"
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
