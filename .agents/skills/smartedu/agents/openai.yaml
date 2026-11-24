@@ -1,0 +1,4 @@
+interface:
+  display_name: "教材下载与点读资源"
+  short_description: "下载智慧教育平台教材，生成高清 PNG、点读内容与离线预览"
+  default_prompt: "使用 $smartedu 按步骤处理教材，先验证一张封面和一张正文的点读资源。"
