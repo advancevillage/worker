@@ -63,15 +63,26 @@ check() {
   if ! xcode-select -p; then
     die '缺少 Command Line Tools，请执行 xcode-select --install，安装完成后重试'
   fi
-  local tool
-  for tool in brew git rg go node npm codex; do
+  local tool app
+  for tool in brew git zsh nvim rg go node npm codex; do
     command -v "$tool" || note "待安装：$tool"
   done
-  if /usr/bin/nc -z -w 3 127.0.0.1 7890; then
+  for app in 'Clash Verge' 'Sublime Text'; do
+    if [[ -d "/Applications/$app.app" || -d "$HOME/Applications/$app.app" ]]; then
+      note "找到应用：$app"
+    else
+      note "待检查应用：$app"
+    fi
+  done
+  if proxy_reachable; then
     note '代理端口可连接：127.0.0.1:7890'
   else
-    die '无法连接代理 127.0.0.1:7890，请启动代理后重试'
+    note '无法连接代理 127.0.0.1:7890，请按桌面软件配置准备 Clash Verge'
   fi
+}
+
+proxy_reachable() {
+  /usr/bin/nc -z -G 3 127.0.0.1 7890
 }
 
 prepare_nvim() {
@@ -104,10 +115,12 @@ prepare_nvim() {
 verify() {
   local tool prefix installed latest
   /bin/zsh -n "${ZDOTDIR:-$HOME}/.zshrc"
-  for tool in brew rg go node npm codex; do
+  for tool in brew zsh nvim rg go node npm codex; do
     command -v "$tool" || die "找不到命令：$tool"
   done
   brew --version
+  /bin/zsh --version
+  nvim --version
   rg --version
   go version
   node --version
@@ -141,6 +154,7 @@ verify() {
 apply() {
   local installer formula prefix existing expected
   check
+  proxy_reachable || die '无法连接代理 127.0.0.1:7890，请先完成 Clash Verge 配置'
   mkdir -p "$HOME/.config"
   if ! command -v brew >/dev/null 2>&1; then
     installer="$(mktemp -t localhost-brew-install)"
@@ -151,7 +165,7 @@ apply() {
   fi
   configure_zsh "${ZDOTDIR:-$HOME}/.zshrc"
   brew update
-  for formula in ripgrep go node; do
+  for formula in ripgrep neovim go node; do
     if brew list --versions "$formula" >/dev/null 2>&1; then
       brew upgrade "$formula"
     else

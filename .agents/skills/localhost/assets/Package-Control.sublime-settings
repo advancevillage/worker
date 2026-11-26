@@ -1,0 +1,14 @@
+{
+  "installed_packages": [
+    "LSP",
+    "LSP-intelephense",
+    "Package Control",
+    "SideBarEnhancements",
+    "SQLExec",
+    "Terminus"
+  ],
+  "channels": [
+    "https://packagecontrol.io/channel_v3.json"
+  ],
+  "http_proxy": "http://127.0.0.1:7890"
+}
